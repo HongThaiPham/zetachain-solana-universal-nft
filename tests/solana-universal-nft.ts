@@ -2,10 +2,12 @@ import * as anchor from '@coral-xyz/anchor';
 import { Program } from '@coral-xyz/anchor';
 import { SolanaUniversalNft } from '../target/types/solana_universal_nft';
 import { expect } from 'chai';
+import { keccak256, sha256 } from 'ethereumjs-util';
 
 describe('solana-universal-nft', () => {
   // Configure the client to use the local cluster.
-  anchor.setProvider(anchor.AnchorProvider.env());
+  const provider = anchor.AnchorProvider.env();
+  anchor.setProvider(provider);
 
   const program = anchor.workspace
     .solanaUniversalNft as Program<SolanaUniversalNft>;
@@ -43,6 +45,7 @@ describe('solana-universal-nft', () => {
   );
 
   console.table({
+    payer: program.provider.wallet.publicKey.toBase58(),
     mint: mintKeypair.publicKey.toBase58(),
     configAddress: configAddress.toBase58(),
     metadataAddress: metadataAddress.toBase58(),
@@ -69,6 +72,24 @@ describe('solana-universal-nft', () => {
   });
 
   it('Creates a new NFT', async () => {
+    const configAccount = await program.account.programConfig.fetch(
+      configAddress
+    );
+
+    const slot = await provider.connection.getSlot();
+    console.log('slot:', slot);
+    console.log('configAccount:', configAccount.nextTokenNonce);
+    const buffer = Buffer.concat([
+      mintKeypair.publicKey.toBuffer(),
+      new anchor.BN(4).toArrayLike(Buffer, 'le', 8),
+      configAccount.nextTokenNonce.toArrayLike(Buffer, 'le', 8),
+    ]);
+
+    const [originNftAddress] = anchor.web3.PublicKey.findProgramAddressSync(
+      [sha256(buffer), Buffer.from('nft_origin')],
+      program.programId
+    );
+    console.log('originNftAddress:', originNftAddress.toBase58());
     const tx = await program.methods
       .newNft('Solana Universal NFT', 'SUN', 'https://example.com/nft')
       .accounts({
@@ -77,6 +98,7 @@ describe('solana-universal-nft', () => {
         recipient: program.provider.wallet.publicKey,
         masterEdition: masterEditionAddress,
         metadata: metadataAddress,
+        originNft: originNftAddress,
       })
       .signers([mintKeypair])
       .rpc();

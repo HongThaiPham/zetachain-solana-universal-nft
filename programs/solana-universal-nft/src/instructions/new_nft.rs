@@ -1,4 +1,8 @@
-use anchor_lang::{prelude::*, solana_program::keccak};
+use anchor_lang::{
+    prelude::*,
+    solana_program::{hash, keccak},
+    system_program,
+};
 use anchor_spl::{
     associated_token::AssociatedToken,
     metadata::{
@@ -9,7 +13,7 @@ use anchor_spl::{
 };
 use mpl_token_metadata::types::DataV2;
 
-use crate::ProgramConfig;
+use crate::{error::UniversalNftErrorCode, OriginNft, ProgramConfig};
 
 #[derive(Accounts)]
 pub struct NewNft<'info> {
@@ -42,6 +46,11 @@ pub struct NewNft<'info> {
         associated_token::authority = recipient
     )]
     pub recipient_ata: Account<'info, TokenAccount>,
+    // #[account(init, payer = payer, space = 8 + OriginNft::INIT_SPACE)]
+    // pub origin_nft: Account<'info, OriginNft>,
+    /// CHECK: oooooookkkkk
+    // #[account(mut)]
+    pub origin_nft: UncheckedAccount<'info>,
     pub token_program: Program<'info, Token>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
@@ -51,27 +60,83 @@ pub struct NewNft<'info> {
 
 impl<'info> NewNft<'info> {
     pub fn handler(&mut self, name: String, symbol: String, uri: String) -> Result<()> {
-        let slot = Clock::get()?.slot;
-        let next_token_nonce = self.config_account.next_token_nonce;
-
-        // make a next_token_id by combine [mint pubkey + slot + next_token_nonce]
-        let mut token_id_bytes = Vec::new();
-        token_id_bytes.extend_from_slice(self.mint.key().as_ref());
-        token_id_bytes.extend_from_slice(&slot.to_le_bytes());
-        token_id_bytes.extend_from_slice(&next_token_nonce.to_le_bytes());
-
-        // Hash the bytes for a fixed-length ID
-        let _next_token_id: [u8; 32] = keccak::hash(&token_id_bytes)
-            .to_bytes()
-            .try_into()
-            .expect("Failed to convert hash to fixed-length array");
-
-        self.create_a_new_nft(name, symbol, uri)?;
+        self.create_a_new_nft(&name, &symbol, &uri)?;
+        self.init_origin_nft_account(&name, &symbol, &uri)?;
         self.config_account.increment_token_nonce();
         Ok(())
     }
 
-    fn create_a_new_nft(&mut self, name: String, symbol: String, uri: String) -> Result<()> {
+    fn init_origin_nft_account(
+        &mut self,
+        name: &String,
+        symbol: &String,
+        uri: &String,
+    ) -> Result<()> {
+        let slot = Clock::get()?.slot;
+        msg!("slot: {}", slot);
+        let next_token_nonce = self.config_account.next_token_nonce;
+        msg!("next_token_nonce: {}", next_token_nonce);
+        // make a next_token_id by combine [mint pubkey + slot + next_token_nonce]
+        // let mut token_id_bytes = Vec::new();
+        // token_id_bytes.extend_from_slice(self.mint.key().as_ref());
+        // token_id_bytes.extend_from_slice(&slot.to_le_bytes());
+        // token_id_bytes.extend_from_slice(&next_token_nonce.to_le_bytes());
+
+        // // Hash the bytes for a fixed-length ID
+        // let token_id = keccak::hash(&token_id_bytes).to_bytes();
+
+        // let (xxx, bump) = self
+        //     .origin_nft
+        //     .validate_pda(self.origin_nft.key(), &token_id)?;
+
+        let mut hasher = hash::Hasher::default();
+        hasher.hash(self.mint.key().as_ref());
+        hasher.hash(&slot.to_le_bytes());
+        hasher.hash(&next_token_nonce.to_le_bytes());
+        let token_id = hasher.result().to_bytes();
+
+        let (pda, bump) = Pubkey::find_program_address(&[&token_id, OriginNft::SEED], &crate::ID);
+        msg!("pda: {} and bump: {}", pda, bump);
+        require!(
+            pda.eq(&self.origin_nft.key()),
+            UniversalNftErrorCode::InvalidOriginNft
+        );
+
+        require!(
+            self.origin_nft.to_account_info().data_is_empty(),
+            UniversalNftErrorCode::OriginNftAccountAlreadyExists
+        );
+
+        let space: usize = 8 + OriginNft::INIT_SPACE;
+
+        let signer_seeds: &[&[u8]] = &[&token_id, OriginNft::SEED, &[bump]];
+
+        // system_program::create_account(
+        //     CpiContext::new_with_signer(
+        //         self.system_program.to_account_info(),
+        //         anchor_lang::system_program::CreateAccount {
+        //             from: self.payer.to_account_info(),
+        //             to: self.origin_nft.to_account_info(),
+        //         },
+        //         &[signer_seeds],
+        //     ),
+        //     Rent::get()?.minimum_balance(space),
+        //     space as u64,
+        //     &crate::ID,
+        // )?;
+
+        // self.origin_nft.set_inner(OriginNft {
+        //     token_id: token_id,
+        //     mint: self.mint.key(),
+        //     name: name.to_string(),
+        //     symbol: symbol.to_string(),
+        //     uri: uri.to_string(),
+        //     bump,
+        // });
+        Ok(())
+    }
+
+    fn create_a_new_nft(&mut self, name: &String, symbol: &String, uri: &String) -> Result<()> {
         // mint to
         mint_to(
             CpiContext::new(
@@ -89,9 +154,9 @@ impl<'info> NewNft<'info> {
         let data = DataV2 {
             collection: Option::None,
             creators: Option::None,
-            name,
-            symbol,
-            uri,
+            name: name.to_string(),
+            symbol: symbol.to_string(),
+            uri: uri.to_string(),
             seller_fee_basis_points: 0,
             uses: Option::None,
         };
