@@ -22,7 +22,13 @@ pub mod solana_universal_nft {
         ctx.accounts.handler(gateway_program, &ctx.bumps)
     }
 
-    pub fn new_nft(ctx: Context<NewNft>, name: String, symbol: String, uri: String) -> Result<()> {
-        ctx.accounts.handler(name, symbol, uri)
+    pub fn new_nft(
+        ctx: Context<NewNft>,
+        slot: u64,
+        name: String,
+        symbol: String,
+        uri: String,
+    ) -> Result<()> {
+        ctx.accounts.handler(slot, name, symbol, uri)
     }
 }

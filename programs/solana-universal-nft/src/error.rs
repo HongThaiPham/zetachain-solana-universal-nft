@@ -4,4 +4,5 @@ use anchor_lang::prelude::*;
 pub enum UniversalNftErrorCode {
     InvalidOriginNft,
     OriginNftAccountAlreadyExists,
+    InvalidSlotProvided,
 }

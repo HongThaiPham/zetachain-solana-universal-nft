@@ -81,7 +81,7 @@ describe('solana-universal-nft', () => {
     console.log('configAccount:', configAccount.nextTokenNonce);
     const buffer = Buffer.concat([
       mintKeypair.publicKey.toBuffer(),
-      new anchor.BN(4).toArrayLike(Buffer, 'le', 8),
+      new anchor.BN(slot).toArrayLike(Buffer, 'le', 8),
       configAccount.nextTokenNonce.toArrayLike(Buffer, 'le', 8),
     ]);
 
@@ -91,7 +91,12 @@ describe('solana-universal-nft', () => {
     );
     console.log('originNftAddress:', originNftAddress.toBase58());
     const tx = await program.methods
-      .newNft('Solana Universal NFT', 'SUN', 'https://example.com/nft')
+      .newNft(
+        new anchor.BN(slot),
+        'Solana Universal NFT',
+        'SUN',
+        'https://example.com/nft'
+      )
       .accounts({
         payer: program.provider.wallet.publicKey,
         mint: mintKeypair.publicKey,
