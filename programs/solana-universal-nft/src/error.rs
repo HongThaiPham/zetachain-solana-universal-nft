@@ -6,4 +6,6 @@ pub enum UniversalNftErrorCode {
     OriginNftAccountAlreadyExists,
     InvalidSlotProvided,
     InvalidGateway,
+    InvalidInstructionData,
+    InvalidCrossChainMessage,
 }

@@ -87,7 +87,7 @@ impl<'info> NewNft<'info> {
 
         let token_id = mint_to_token_id(&self.mint.key(), slot, token_nonce);
 
-        let (pda, bump) = OriginNft::validate_pda(self.origin_nft.key(), &token_id)?;
+        let (_, bump) = OriginNft::validate_pda(self.origin_nft.key(), &token_id)?;
 
         require!(
             self.origin_nft.to_account_info().data_is_empty(),

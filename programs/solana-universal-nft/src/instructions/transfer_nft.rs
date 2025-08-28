@@ -1,10 +1,10 @@
-use anchor_lang::{prelude::*, solana_program::stake::config::Config};
+use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 
 use crate::{
     error::UniversalNftErrorCode,
-    gateway::{self, cpi::accounts::DepositSplToken, program::Gateway, types::RevertOptions},
-    mint_to_token_id, OriginNft, ProgramConfig,
+    gateway::{self, program::Gateway},
+    CrossChainFunction, CrossChainMessage, OriginNft, ProgramConfig,
 };
 
 #[derive(Accounts)]
@@ -45,14 +45,6 @@ impl<'info> TransferNft<'info> {
         // Transfer the NFT
         let nft_origin = &self.origin_nft;
 
-        let mut message = Vec::new();
-        // message include sender, receiver, mint
-        message.extend_from_slice(&dest_chain_id.to_le_bytes());
-        message.extend_from_slice(self.mint.key().as_ref());
-        message.extend_from_slice(nft_origin.token_id.as_ref());
-        message.extend_from_slice(self.sender.key().as_ref());
-        message.extend_from_slice(recipient.as_ref());
-
         gateway::cpi::deposit_and_call(
             CpiContext::new(
                 self.gateway_program.to_account_info(),
@@ -64,7 +56,16 @@ impl<'info> TransferNft<'info> {
             ),
             1,
             recipient,
-            message,
+            CrossChainMessage {
+                sender: self.sender.key(),
+                mint: nft_origin.mint,
+                token_id: nft_origin.token_id,
+                recipient,
+                dest_chain_id,
+                fun: CrossChainFunction::TransferNft,
+            }
+            .try_to_vec()
+            .unwrap(),
             None,
         )?;
 
