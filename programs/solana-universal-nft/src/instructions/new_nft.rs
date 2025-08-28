@@ -83,13 +83,11 @@ impl<'info> NewNft<'info> {
             slot >= current_slot - MAX_PASS_SLOT,
             UniversalNftErrorCode::InvalidSlotProvided
         );
-        let next_token_nonce = self.config_account.next_token_nonce;
-        msg!("next_token_nonce: {}", next_token_nonce);
+        let token_nonce = self.config_account.next_token_nonce;
 
-        let token_id = mint_to_token_id(&self.mint.key(), slot, next_token_nonce);
+        let token_id = mint_to_token_id(&self.mint.key(), slot, token_nonce);
 
         let (pda, bump) = OriginNft::validate_pda(self.origin_nft.key(), &token_id)?;
-        msg!("pda: {} and bump: {}", pda, bump);
 
         require!(
             self.origin_nft.to_account_info().data_is_empty(),
@@ -123,6 +121,7 @@ impl<'info> NewNft<'info> {
             uri: uri.clone(),
             slot,
             bump,
+            token_nonce,
         };
 
         // Serialize the account data directly to the account

@@ -8,6 +8,7 @@ use crate::error::UniversalNftErrorCode;
 pub struct OriginNft {
     pub token_id: [u8; 32],
     pub slot: u64,
+    pub token_nonce: u64,
     pub mint: Pubkey,
     #[max_len(MAX_NAME_LENGTH)]
     pub name: String,
